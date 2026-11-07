@@ -385,13 +385,31 @@ impl PvaultApp {
         if let Ok(mut cb) = Clipboard::new() {
             let _ = cb.set_text(text.to_string());
         }
+        // Copy to standard Wayland clipboard
         let _ = std::process::Command::new("wl-copy").arg(text).spawn();
+        // Also copy to Linux Primary Selection (middle-click buffer)
+        let _ = std::process::Command::new("wl-copy")
+            .arg("--primary")
+            .arg(text)
+            .spawn();
+
         if simulate_paste {
+            let t = text.to_string();
             std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(150));
-                let _ = std::process::Command::new("xdotool")
-                    .args(["key", "--clearmodifiers", "ctrl+shift+v"])
-                    .spawn();
+                // Wait for the window to close and KWin to refocus the previous active window
+                std::thread::sleep(std::time::Duration::from_millis(250));
+
+                // Try wtype first (native Wayland modifier paste Ctrl+Shift+V)
+                let wtype_res = std::process::Command::new("wtype")
+                    .args(["-M", "ctrl", "-M", "shift", "-k", "v", "-m", "shift", "-m", "ctrl"])
+                    .status();
+
+                // If wtype fails, try typing text directly or fallback
+                if wtype_res.is_err() {
+                    let _ = std::process::Command::new("xdotool")
+                        .args(["key", "--clearmodifiers", "ctrl+shift+v"])
+                        .spawn();
+                }
             });
         }
     }
