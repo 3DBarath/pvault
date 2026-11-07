@@ -951,12 +951,32 @@ impl PvaultApp {
 
                 ui.add_space(10.0);
 
+                let title_id = ui.make_persistent_id("form_title_field");
+                let proj_id = ui.make_persistent_id("form_proj_field");
                 let content_id = ui.make_persistent_id("content_editor_area");
+
+                let first_field_id = if self.tab == TabMode::Vault { title_id } else { proj_id };
+
+                // Handle Tab navigation inside form
+                let tab_pressed = ctx.input(|i| i.key_pressed(Key::Tab));
+                let shift_held = ctx.input(|i| i.modifiers.shift);
+
+                if tab_pressed {
+                    let first_has_focus = ctx.memory(|m| m.has_focus(first_field_id));
+                    let content_has_focus = ctx.memory(|m| m.has_focus(content_id));
+
+                    if first_has_focus {
+                        ctx.memory_mut(|m| m.request_focus(content_id));
+                    } else if content_has_focus && shift_held {
+                        ctx.memory_mut(|m| m.request_focus(first_field_id));
+                    }
+                }
 
                 if self.tab == TabMode::Vault {
                     let title_res = ui.add_sized(
                         [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.new_title)
+                            .id(title_id)
                             .hint_text("Title")
                             .font(FontId::proportional(13.5))
                             .text_color(Color32::from_rgb(243, 244, 246)),
@@ -967,7 +987,7 @@ impl PvaultApp {
                         self.request_focus = false;
                     }
 
-                    // Pressing Enter in singleline title or Tab moves focus directly to content
+                    // Pressing Enter in singleline title moves focus directly to content
                     if title_res.lost_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
                         ctx.memory_mut(|m| m.request_focus(content_id));
                     }
@@ -977,6 +997,7 @@ impl PvaultApp {
                     let proj_res = ui.add_sized(
                         [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.new_project)
+                            .id(proj_id)
                             .hint_text("Project (optional, e.g. pvault)")
                             .font(FontId::proportional(13.0))
                             .text_color(Color32::from_rgb(243, 244, 246)),
