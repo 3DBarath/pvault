@@ -381,7 +381,7 @@ impl PvaultApp {
         scored.into_iter().map(|(_, idx)| idx).collect()
     }
 
-    fn copy_text(&self, text: &str, simulate_paste: bool) {
+    fn copy_text(&self, text: &str) {
         if let Ok(mut cb) = Clipboard::new() {
             let _ = cb.set_text(text.to_string());
         }
@@ -392,29 +392,9 @@ impl PvaultApp {
             .arg("--primary")
             .arg(text)
             .spawn();
-
-        if simulate_paste {
-            let t = text.to_string();
-            std::thread::spawn(move || {
-                // Wait for the window to close and KWin to refocus the previous active window
-                std::thread::sleep(std::time::Duration::from_millis(250));
-
-                // Try wtype first (native Wayland modifier paste Ctrl+Shift+V)
-                let wtype_res = std::process::Command::new("wtype")
-                    .args(["-M", "ctrl", "-M", "shift", "-k", "v", "-m", "shift", "-m", "ctrl"])
-                    .status();
-
-                // If wtype fails, try typing text directly or fallback
-                if wtype_res.is_err() {
-                    let _ = std::process::Command::new("xdotool")
-                        .args(["key", "--clearmodifiers", "ctrl+shift+v"])
-                        .spawn();
-                }
-            });
-        }
     }
 
-    fn consume_prompt(&mut self, orig_idx: usize, simulate_paste: bool, ctx: &egui::Context) {
+    fn consume_prompt(&mut self, orig_idx: usize, ctx: &egui::Context) {
         let p = &self.prompts[orig_idx];
         let text = p.text.clone();
         let id = p.id.clone();
@@ -424,18 +404,18 @@ impl PvaultApp {
             "UPDATE prompts SET uses = ?1, updated = ?2 WHERE id = ?3",
             params![new_uses, now, id],
         );
-        self.copy_text(&text, simulate_paste);
+        self.copy_text(&text);
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
 
-    fn consume_idea(&mut self, orig_idx: usize, mark_done: bool, simulate_paste: bool, ctx: &egui::Context) {
+    fn consume_idea(&mut self, orig_idx: usize, mark_done: bool, ctx: &egui::Context) {
         let idea = &self.ideas[orig_idx];
         let text = idea.body.clone();
         let id = idea.id;
         if mark_done {
             let _ = self.conn.execute("UPDATE ideas SET status = 'done' WHERE id = ?1", params![id]);
         }
-        self.copy_text(&text, simulate_paste);
+        self.copy_text(&text);
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
 }
@@ -560,15 +540,15 @@ impl eframe::App for PvaultApp {
             match self.tab {
                 TabMode::Vault => {
                     if let Some(&orig_idx) = prompt_indices.get(self.selected_index) {
-                        self.consume_prompt(orig_idx, is_shift, ctx);
+                        self.consume_prompt(orig_idx, ctx);
                         return;
                     }
                 }
                 TabMode::Queue => {
                     if let Some(&orig_idx) = idea_indices.get(self.selected_index) {
-                        // Enter = mark done & consume; Shift+Enter = copy only (keep)
+                        // Enter = mark done & consume; Shift+Enter = copy only (keep in queue)
                         let mark_done = !is_shift;
-                        self.consume_idea(orig_idx, mark_done, is_shift, ctx);
+                        self.consume_idea(orig_idx, mark_done, ctx);
                         return;
                     }
                 }
@@ -812,10 +792,10 @@ impl PvaultApp {
         self.scroll_to_selected = false;
 
         if let Some(orig_idx) = clicked_prompt_idx {
-            self.consume_prompt(orig_idx, false, ctx);
+            self.consume_prompt(orig_idx, ctx);
         }
         if let Some(orig_idx) = clicked_idea_idx {
-            self.consume_idea(orig_idx, true, false, ctx);
+            self.consume_idea(orig_idx, true, ctx);
         }
 
         // Bottom status bar
@@ -832,7 +812,7 @@ impl PvaultApp {
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
                         let hint = match self.tab {
-                            TabMode::Vault => "↵ Copy  •  ⇧↵ Paste  •  Ctrl+F Fav  •  Ctrl+N New",
+                            TabMode::Vault => "↵ Copy  •  Ctrl+F Fav  •  Ctrl+N New  •  Tab Switch",
                             TabMode::Queue => "↵ Copy & Done  •  ⇧↵ Copy (Keep)  •  Ctrl+P Project  •  Ctrl+N Jot",
                         };
                         ui.label(RichText::new(hint).color(Color32::from_rgb(107, 114, 128)).font(FontId::monospace(10.0)));
