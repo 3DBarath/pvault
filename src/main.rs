@@ -646,7 +646,7 @@ impl PvaultApp {
             .inner_margin(egui::Margin::symmetric(16.0, 10.0))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    if self.tab == TabMode::Queue {
+                    if self.tab == TabMode::Queue && !self.projects.is_empty() {
                         let proj_label = if self.selected_project_idx == 0 {
                             "all".to_string()
                         } else {
@@ -788,16 +788,17 @@ impl PvaultApp {
                                 .inner_margin(egui::Margin::symmetric(14.0, 7.0))
                                 .show(ui, |ui: &mut egui::Ui| {
                                     ui.horizontal(|ui: &mut egui::Ui| {
-                                        // Project badge aligned on left
-                                        egui::Frame::none()
-                                            .fill(Color32::from_rgb(26, 29, 42))
-                                            .rounding(Rounding::same(4.0))
-                                            .inner_margin(egui::Margin::symmetric(6.0, 2.0))
-                                            .show(ui, |ui| {
-                                                ui.label(RichText::new(&proj_tag).color(Color32::from_rgb(130, 145, 185)).font(FontId::monospace(11.5)));
-                                            });
-
-                                        ui.add_space(8.0);
+                                        // Only show project badge if task has a project tag
+                                        if !idea.project.is_empty() {
+                                            egui::Frame::none()
+                                                .fill(Color32::from_rgb(26, 29, 42))
+                                                .rounding(Rounding::same(4.0))
+                                                .inner_margin(egui::Margin::symmetric(6.0, 2.0))
+                                                .show(ui, |ui| {
+                                                    ui.label(RichText::new(&idea.project).color(Color32::from_rgb(130, 145, 185)).font(FontId::monospace(11.5)));
+                                                });
+                                            ui.add_space(8.0);
+                                        }
 
                                         // Body text
                                         ui.label(RichText::new(clean_body).color(Color32::from_rgb(235, 237, 242)).font(FontId::proportional(13.5)));
@@ -838,11 +839,13 @@ impl PvaultApp {
                 .inner_margin(egui::Margin::symmetric(16.0, 8.0))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        let hint = match self.tab {
-                            TabMode::Vault => "↵ copy  •  ^f favorite  •  ^n new",
-                            TabMode::Queue => "↵ copy & done  •  ^p project  •  ^n jot",
-                        };
-                        ui.label(RichText::new(hint).color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
+                    if self.tab == TabMode::Queue && !self.projects.is_empty() {
+                        ui.label(RichText::new("↵ copy & done  •  ^p project  •  ^n jot").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
+                    } else if self.tab == TabMode::Queue {
+                        ui.label(RichText::new("↵ copy & done  •  ^n jot").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
+                    } else {
+                        ui.label(RichText::new("↵ copy  •  ^f favorite  •  ^n new").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
+                    }
                     });
                 });
         });
