@@ -295,6 +295,7 @@ struct PvaultApp {
     matcher: SkimMatcherV2,
     request_focus: bool,
     scroll_to_selected: bool,
+    had_focus: bool,
 }
 
 impl PvaultApp {
@@ -320,6 +321,7 @@ impl PvaultApp {
             matcher: SkimMatcherV2::default(),
             request_focus: true,
             scroll_to_selected: false,
+            had_focus: false,
         }
     }
 
@@ -438,6 +440,15 @@ impl eframe::App for PvaultApp {
         let mut do_fav = false;
         let mut do_enter = false;
         let mut is_shift = false;
+
+        // Auto-close on focus lost (unless user is in Create mode copying back and forth)
+        let is_focused = ctx.input(|i| i.viewport().focused.unwrap_or(true));
+        if is_focused {
+            self.had_focus = true;
+        } else if self.had_focus && self.sub_mode != AppSubMode::Create {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            return;
+        }
 
         ctx.input(|i| {
             if i.key_pressed(Key::Escape) {
