@@ -529,6 +529,7 @@ impl eframe::App for PvaultApp {
             } else {
                 String::new()
             };
+            self.request_focus = true;
         }
 
         if do_edit {
@@ -990,24 +991,12 @@ impl PvaultApp {
                     text_res.request_focus();
                 }
 
-                // In the multiline editor: Enter saves/submits, Shift+Enter inserts a newline
+                // In the multiline editor: Enter inserts newline as normal. Ctrl+S or Ctrl+Enter saves.
                 let mut do_save = false;
-                if text_res.has_focus() {
-                    ctx.input(|i| {
-                        if i.key_pressed(Key::Enter) {
-                            if i.modifiers.shift {
-                                // Add newline on Shift+Enter
-                                self.new_text.push('\n');
-                            } else {
-                                // Plain Enter saves
-                                do_save = true;
-                            }
-                        }
-                    });
-                }
-
                 ctx.input(|i| {
-                    if i.modifiers.ctrl && i.key_pressed(Key::S) {
+                    if (i.modifiers.ctrl && i.key_pressed(Key::S))
+                        || (i.modifiers.ctrl && i.key_pressed(Key::Enter))
+                    {
                         do_save = true;
                     }
                 });
