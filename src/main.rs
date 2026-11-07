@@ -446,6 +446,11 @@ impl eframe::App for PvaultApp {
 
         let in_form = self.sub_mode != AppSubMode::List;
 
+        // Ensure window stays pinned on top when editing or creating
+        if in_form {
+            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::AlwaysOnTop));
+        }
+
         // Auto-close on focus lost (unless user is in Create/Edit mode copying back and forth)
         let is_focused = ctx.input(|i| i.viewport().focused.unwrap_or(true));
         if is_focused {
