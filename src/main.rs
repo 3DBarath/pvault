@@ -1025,98 +1025,78 @@ impl PvaultApp {
 
                     ui.add_space(8.0);
                 } else {
-                    // Matching suggestions from pj projects
+                    // Linear-grade ghost auto-completion directly inside the input line
                     let query = self.new_project.trim().to_lowercase();
-                    let matches: Vec<String> = self
-                        .projects
-                        .iter()
-                        .filter(|p| {
-                            if query.is_empty() {
-                                true
-                            } else {
-                                p.to_lowercase().contains(&query)
-                            }
-                        })
-                        .take(5)
-                        .cloned()
-                        .collect();
-
-                    let num_matches = matches.len();
+                    let ghost_completion: Option<String> = if !query.is_empty() {
+                        self.projects
+                            .iter()
+                            .find(|p| p.to_lowercase().starts_with(&query) && p.len() > self.new_project.trim().len())
+                            .or_else(|| {
+                                self.projects
+                                    .iter()
+                                    .find(|p| p.to_lowercase().contains(&query) && !p.eq_ignore_ascii_case(self.new_project.trim()))
+                            })
+                            .cloned()
+                    } else {
+                        None
+                    };
 
                     let is_proj_focused = ctx.memory(|m| m.has_focus(proj_id));
 
-                    // Keyboard navigation and Enter BEFORE rendering the TextEdit so state updates take effect this frame
-                    let mut enter_pressed = false;
+                    // Tab or Enter accepts the ghost completion immediately
                     if is_proj_focused {
-                        if ctx.input(|i| i.key_pressed(Key::ArrowDown)) && num_matches > 0 {
-                            self.suggested_proj_idx = (self.suggested_proj_idx + 1) % num_matches;
-                        }
-                        if ctx.input(|i| i.key_pressed(Key::ArrowUp)) && num_matches > 0 {
-                            self.suggested_proj_idx = if self.suggested_proj_idx == 0 {
-                                num_matches - 1
-                            } else {
-                                self.suggested_proj_idx - 1
-                            };
-                        }
-                        if ctx.input(|i| i.key_pressed(Key::Enter)) {
-                            enter_pressed = true;
-                            if let Some(selected_match) = matches.get(self.suggested_proj_idx) {
-                                self.new_project = selected_match.clone();
+                        if ctx.input(|i| i.key_pressed(Key::Tab) || i.key_pressed(Key::Enter)) {
+                            if let Some(ref completed) = ghost_completion {
+                                self.new_project = completed.clone();
                             }
                             ctx.memory_mut(|m| m.request_focus(content_id));
                         }
                     }
 
-                    if self.suggested_proj_idx >= num_matches {
-                        self.suggested_proj_idx = 0;
-                    }
-
                     let proj_res = ui.horizontal(|ui| {
-                        ui.label(RichText::new("📁").font(FontId::proportional(12.0)));
-                        ui.add_sized(
+                        let response = ui.add_sized(
                             [ui.available_width(), 26.0],
                             egui::TextEdit::singleline(&mut self.new_project)
                                 .id(proj_id)
-                                .hint_text("Project (optional, e.g. pvault)...")
+                                .hint_text("Project")
                                 .font(FontId::proportional(13.5))
                                 .text_color(Color32::from_rgb(243, 244, 246)),
-                        )
+                        );
+
+                        // Render ghost completion inline inside the field (zsh / fish / Copilot style)
+                        if is_proj_focused {
+                            if let Some(ref completed) = ghost_completion {
+                                if completed.to_lowercase().starts_with(&self.new_project.trim().to_lowercase()) {
+                                    let typed_len = self.new_project.trim().len();
+                                    let ghost_suffix = &completed[typed_len..];
+
+                                    let font_id = FontId::proportional(13.5);
+                                    let typed_width = ui.fonts(|f| {
+                                        f.layout_no_wrap(self.new_project.clone(), font_id.clone(), Color32::WHITE).size().x
+                                    });
+
+                                    let ghost_pos = egui::pos2(
+                                        response.rect.left() + 8.0 + typed_width,
+                                        response.rect.center().y - 8.0,
+                                    );
+
+                                    ui.painter().text(
+                                        ghost_pos,
+                                        egui::Align2::LEFT_TOP,
+                                        ghost_suffix,
+                                        font_id,
+                                        Color32::from_rgb(90, 95, 120),
+                                    );
+                                }
+                            }
+                        }
+
+                        response
                     }).inner;
 
                     if self.request_focus {
                         proj_res.request_focus();
                         self.request_focus = false;
-                    }
-
-                    // Ghost auto-complete hint on the right if user typed a partial match
-                    let mut pick_project = None;
-                    if is_proj_focused && !self.new_project.trim().is_empty() && !matches.is_empty() && !enter_pressed {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("match:").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.0)));
-                            if let Some(top_match) = matches.get(self.suggested_proj_idx) {
-                                let btn = egui::Button::new(
-                                    RichText::new(format!("{} (↵ to apply)", top_match))
-                                        .color(Color32::from_rgb(167, 185, 250))
-                                        .font(FontId::monospace(11.5))
-                                )
-                                .fill(Color32::from_rgb(26, 29, 44))
-                                .rounding(Rounding::same(4.0))
-                                .stroke(Stroke::NONE);
-
-                                if ui.add(btn).clicked() {
-                                    pick_project = Some(top_match.clone());
-                                }
-                            }
-                            if num_matches > 1 {
-                                ui.label(RichText::new(format!("+{} more (↑/↓)", num_matches - 1)).color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(10.5)));
-                            }
-                        });
-                        ui.add_space(2.0);
-                    }
-
-                    if let Some(picked) = pick_project {
-                        self.new_project = picked;
-                        ctx.memory_mut(|m| m.request_focus(content_id));
                     }
 
                     ui.add_space(8.0);
