@@ -1003,8 +1003,6 @@ impl PvaultApp {
                     }
                 }
 
-                let mut focus_content = false;
-
                 if self.tab == TabMode::Vault {
                     let title_res = ui.add_sized(
                         [ui.available_width(), 26.0],
@@ -1022,12 +1020,12 @@ impl PvaultApp {
 
                     // Pressing Enter in title advances to content
                     if title_res.has_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
-                        focus_content = true;
+                        ctx.memory_mut(|m| m.request_focus(content_id));
                     }
 
                     ui.add_space(8.0);
                 } else {
-                    // Matching suggestions from pj projects (fzf vertical list style)
+                    // Matching suggestions from pj projects
                     let query = self.new_project.trim().to_lowercase();
                     let matches: Vec<String> = self
                         .projects
@@ -1049,7 +1047,7 @@ impl PvaultApp {
                         [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.new_project)
                             .id(proj_id)
-                            .hint_text("Type project or use ↑/↓ to pick from pj...")
+                            .hint_text("Search or type project from pj...")
                             .font(FontId::proportional(13.5))
                             .text_color(Color32::from_rgb(243, 244, 246)),
                     );
@@ -1059,7 +1057,7 @@ impl PvaultApp {
                         self.request_focus = false;
                     }
 
-                    // Arrow navigation & Enter key handling on project input
+                    // Arrow navigation when typing project
                     if proj_res.has_focus() {
                         if ctx.input(|i| i.key_pressed(Key::ArrowDown)) && num_matches > 0 {
                             self.suggested_proj_idx = (self.suggested_proj_idx + 1) % num_matches;
@@ -1071,26 +1069,20 @@ impl PvaultApp {
                                 self.suggested_proj_idx - 1
                             };
                         }
-                        if ctx.input(|i| i.key_pressed(Key::Enter)) {
-                            if let Some(selected_match) = matches.get(self.suggested_proj_idx) {
-                                self.new_project = selected_match.clone();
-                            }
-                            focus_content = true;
-                        }
                     }
 
                     if self.suggested_proj_idx >= num_matches {
                         self.suggested_proj_idx = 0;
                     }
 
-                    // Render vertical dropdown list like fzf
+                    // Render compact suggestions popup/container
                     let mut pick_project = None;
-                    if !matches.is_empty() {
+                    if proj_res.has_focus() && !matches.is_empty() {
                         egui::Frame::none()
                             .fill(Color32::from_rgb(20, 22, 32))
                             .rounding(Rounding::same(6.0))
                             .stroke(Stroke::new(1.0, Color32::from_rgb(42, 45, 66)))
-                            .inner_margin(egui::Margin::symmetric(6.0, 4.0))
+                            .inner_margin(egui::Margin::symmetric(6.0, 3.0))
                             .show(ui, |ui| {
                                 for (idx, p) in matches.iter().enumerate() {
                                     let is_active = idx == self.suggested_proj_idx;
@@ -1107,14 +1099,24 @@ impl PvaultApp {
 
                                     let prefix = if is_active { "▶ " } else { "  " };
 
-                                    let btn = egui::Button::new(
-                                        RichText::new(format!("{}{}", prefix, p)).color(text_color).font(FontId::monospace(12.0))
-                                    )
-                                    .fill(bg)
-                                    .rounding(Rounding::same(4.0))
-                                    .stroke(Stroke::NONE);
+                                    let mut layout_job = egui::text::LayoutJob::default();
+                                    layout_job.append(prefix, 0.0, egui::TextFormat {
+                                        font_id: FontId::monospace(11.0),
+                                        color: Color32::from_rgb(167, 139, 250),
+                                        ..Default::default()
+                                    });
+                                    layout_job.append(p, 0.0, egui::TextFormat {
+                                        font_id: FontId::monospace(12.0),
+                                        color: text_color,
+                                        ..Default::default()
+                                    });
 
-                                    if ui.add_sized([ui.available_width(), 22.0], btn).clicked() {
+                                    let btn = egui::Button::new(layout_job)
+                                        .fill(bg)
+                                        .rounding(Rounding::same(4.0))
+                                        .stroke(Stroke::NONE);
+
+                                    if ui.add_sized([ui.available_width(), 20.0], btn).clicked() {
                                         pick_project = Some(p.clone());
                                     }
                                 }
@@ -1124,7 +1126,15 @@ impl PvaultApp {
 
                     if let Some(picked) = pick_project {
                         self.new_project = picked;
-                        focus_content = true;
+                        ctx.memory_mut(|m| m.request_focus(content_id));
+                    }
+
+                    // Enter on project field: lock choice and jump focus
+                    if proj_res.has_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
+                        if let Some(selected_match) = matches.get(self.suggested_proj_idx) {
+                            self.new_project = selected_match.clone();
+                        }
+                        ctx.memory_mut(|m| m.request_focus(content_id));
                     }
 
                     ui.add_space(8.0);
@@ -1136,7 +1146,7 @@ impl PvaultApp {
                     .max_height(ui.available_height() - 44.0)
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        let text_res = ui.add_sized(
+                        ui.add_sized(
                             [ui.available_width(), (ui.available_height() - 4.0).max(180.0)],
                             egui::TextEdit::multiline(&mut self.new_text)
                                 .id(content_id)
@@ -1144,10 +1154,6 @@ impl PvaultApp {
                                 .font(FontId::monospace(12.5))
                                 .text_color(Color32::from_rgb(243, 244, 246)),
                         );
-
-                        if focus_content {
-                            text_res.request_focus();
-                        }
                     });
 
                 // In the multiline editor: Enter inserts newline as normal. Ctrl+S or Ctrl+Enter saves.
