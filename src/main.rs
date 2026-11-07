@@ -277,6 +277,7 @@ enum TabMode {
 enum AppSubMode {
     List,
     Create,
+    Edit(usize), // editing existing prompt or idea index
 }
 
 struct PvaultApp {
@@ -440,12 +441,16 @@ impl eframe::App for PvaultApp {
         let mut do_fav = false;
         let mut do_enter = false;
         let mut is_shift = false;
+        let mut do_edit = false;
+        let mut do_delete = false;
 
-        // Auto-close on focus lost (unless user is in Create mode copying back and forth)
+        let in_form = self.sub_mode != AppSubMode::List;
+
+        // Auto-close on focus lost (unless user is in Create/Edit mode copying back and forth)
         let is_focused = ctx.input(|i| i.viewport().focused.unwrap_or(true));
         if is_focused {
             self.had_focus = true;
-        } else if self.had_focus && self.sub_mode != AppSubMode::Create {
+        } else if self.had_focus && !in_form {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             return;
         }
@@ -454,14 +459,20 @@ impl eframe::App for PvaultApp {
             if i.key_pressed(Key::Escape) {
                 do_escape = true;
             }
-            if i.key_pressed(Key::Tab) {
+            if i.key_pressed(Key::Tab) && !in_form {
                 do_tab = true;
             }
-            if i.modifiers.ctrl && i.key_pressed(Key::P) {
+            if i.modifiers.ctrl && i.key_pressed(Key::P) && !in_form {
                 do_ctrl_p = true;
             }
-            if i.modifiers.ctrl && i.key_pressed(Key::N) {
+            if i.modifiers.ctrl && i.key_pressed(Key::N) && !in_form {
                 do_ctrl_n = true;
+            }
+            if i.modifiers.ctrl && i.key_pressed(Key::E) && !in_form {
+                do_edit = true;
+            }
+            if i.modifiers.ctrl && i.key_pressed(Key::D) && !in_form {
+                do_delete = true;
             }
 
             if self.sub_mode == AppSubMode::List {
@@ -482,7 +493,7 @@ impl eframe::App for PvaultApp {
         });
 
         if do_escape {
-            if self.sub_mode == AppSubMode::Create {
+            if self.sub_mode != AppSubMode::List {
                 self.sub_mode = AppSubMode::List;
                 self.request_focus = true;
             } else {
@@ -518,6 +529,54 @@ impl eframe::App for PvaultApp {
             } else {
                 String::new()
             };
+        }
+
+        if do_edit {
+            match self.tab {
+                TabMode::Vault => {
+                    if let Some(&orig_idx) = prompt_indices.get(self.selected_index) {
+                        let p = &self.prompts[orig_idx];
+                        self.new_title = p.title.clone();
+                        self.new_text = p.text.clone();
+                        self.sub_mode = AppSubMode::Edit(orig_idx);
+                        self.request_focus = true;
+                    }
+                }
+                TabMode::Queue => {
+                    if let Some(&orig_idx) = idea_indices.get(self.selected_index) {
+                        let idea = &self.ideas[orig_idx];
+                        self.new_project = idea.project.clone();
+                        self.new_text = idea.body.clone();
+                        self.sub_mode = AppSubMode::Edit(orig_idx);
+                        self.request_focus = true;
+                    }
+                }
+            }
+        }
+
+        if do_delete {
+            match self.tab {
+                TabMode::Vault => {
+                    if let Some(&orig_idx) = prompt_indices.get(self.selected_index) {
+                        let id = self.prompts[orig_idx].id.clone();
+                        let _ = self.conn.execute("DELETE FROM prompts WHERE id = ?1", params![id]);
+                        self.reload_data();
+                        if self.selected_index > 0 && self.selected_index >= prompt_indices.len().saturating_sub(1) {
+                            self.selected_index = self.selected_index.saturating_sub(1);
+                        }
+                    }
+                }
+                TabMode::Queue => {
+                    if let Some(&orig_idx) = idea_indices.get(self.selected_index) {
+                        let id = self.ideas[orig_idx].id;
+                        let _ = self.conn.execute("DELETE FROM ideas WHERE id = ?1", params![id]);
+                        self.reload_data();
+                        if self.selected_index > 0 && self.selected_index >= idea_indices.len().saturating_sub(1) {
+                            self.selected_index = self.selected_index.saturating_sub(1);
+                        }
+                    }
+                }
+            }
         }
 
         if do_down && total_items > 0 {
@@ -622,7 +681,7 @@ impl eframe::App for PvaultApp {
 
                         ui.separator();
 
-                        if self.sub_mode == AppSubMode::Create {
+                        if self.sub_mode != AppSubMode::List {
                             self.render_create_view(ui, ctx);
                         } else {
                             self.render_list_view(ui, ctx, &prompt_indices, &idea_indices);
@@ -840,11 +899,11 @@ impl PvaultApp {
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
                     if self.tab == TabMode::Queue && !self.projects.is_empty() {
-                        ui.label(RichText::new("↵ copy & done  •  ^p project  •  ^n jot").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
+                        ui.label(RichText::new("↵ done  •  ^e edit  •  ^d delete  •  ^p project  •  ^n jot").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
                     } else if self.tab == TabMode::Queue {
-                        ui.label(RichText::new("↵ copy & done  •  ^n jot").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
+                        ui.label(RichText::new("↵ done  •  ^e edit  •  ^d delete  •  ^n jot").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
                     } else {
-                        ui.label(RichText::new("↵ copy  •  ^f favorite  •  ^n new").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
+                        ui.label(RichText::new("↵ copy  •  ^e edit  •  ^d delete  •  ^f fav  •  ^n new").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
                     }
                     });
                 });
@@ -853,9 +912,12 @@ impl PvaultApp {
 
     fn render_create_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.add_space(4.0);
-        let header = match self.tab {
-            TabMode::Vault => "New Prompt",
-            TabMode::Queue => "Jot Idea",
+        let is_editing = matches!(self.sub_mode, AppSubMode::Edit(_));
+        let header = match (self.tab, is_editing) {
+            (TabMode::Vault, false) => "New Prompt",
+            (TabMode::Vault, true) => "Edit Prompt",
+            (TabMode::Queue, false) => "Jot Idea",
+            (TabMode::Queue, true) => "Edit Idea",
         };
 
         egui::Frame::none()
@@ -908,28 +970,58 @@ impl PvaultApp {
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
                     if ui.button(RichText::new("Save").color(Color32::from_rgb(167, 139, 250))).clicked() || do_save {
-                        if self.tab == TabMode::Vault {
-                            if !self.new_title.trim().is_empty() && !self.new_text.trim().is_empty() {
-                                let id = random_id();
-                                let now = now_millis();
-                                let _ = self.conn.execute(
-                                    "INSERT INTO prompts (id, title, text, fav, uses, created, updated) VALUES (?1, ?2, ?3, 1, 0, ?4, ?4)",
-                                    params![id, self.new_title.trim(), self.new_text.trim(), now],
-                                );
-                                self.reload_data();
-                                self.sub_mode = AppSubMode::List;
-                                self.request_focus = true;
+                        match self.sub_mode {
+                            AppSubMode::Create => {
+                                if self.tab == TabMode::Vault {
+                                    if !self.new_title.trim().is_empty() && !self.new_text.trim().is_empty() {
+                                        let id = random_id();
+                                        let now = now_millis();
+                                        let _ = self.conn.execute(
+                                            "INSERT INTO prompts (id, title, text, fav, uses, created, updated) VALUES (?1, ?2, ?3, 1, 0, ?4, ?4)",
+                                            params![id, self.new_title.trim(), self.new_text.trim(), now],
+                                        );
+                                        self.reload_data();
+                                        self.sub_mode = AppSubMode::List;
+                                        self.request_focus = true;
+                                    }
+                                } else if !self.new_text.trim().is_empty() {
+                                    let now = chrono::Utc::now().to_rfc3339();
+                                    let proj = self.new_project.trim();
+                                    let _ = self.conn.execute(
+                                        "INSERT INTO ideas (body, project, status, created_at) VALUES (?1, ?2, 'inbox', ?3)",
+                                        params![self.new_text.trim(), proj, now],
+                                    );
+                                    self.reload_data();
+                                    self.sub_mode = AppSubMode::List;
+                                    self.request_focus = true;
+                                }
                             }
-                        } else if !self.new_text.trim().is_empty() {
-                            let now = chrono::Utc::now().to_rfc3339();
-                            let proj = self.new_project.trim();
-                            let _ = self.conn.execute(
-                                "INSERT INTO ideas (body, project, status, created_at) VALUES (?1, ?2, 'inbox', ?3)",
-                                params![self.new_text.trim(), proj, now],
-                            );
-                            self.reload_data();
-                            self.sub_mode = AppSubMode::List;
-                            self.request_focus = true;
+                            AppSubMode::Edit(orig_idx) => {
+                                if self.tab == TabMode::Vault {
+                                    if let Some(p) = self.prompts.get(orig_idx) {
+                                        let id = p.id.clone();
+                                        let now = now_millis();
+                                        let _ = self.conn.execute(
+                                            "UPDATE prompts SET title = ?1, text = ?2, updated = ?3 WHERE id = ?4",
+                                            params![self.new_title.trim(), self.new_text.trim(), now, id],
+                                        );
+                                        self.reload_data();
+                                        self.sub_mode = AppSubMode::List;
+                                        self.request_focus = true;
+                                    }
+                                } else if let Some(idea) = self.ideas.get(orig_idx) {
+                                    let id = idea.id;
+                                    let proj = self.new_project.trim();
+                                    let _ = self.conn.execute(
+                                        "UPDATE ideas SET body = ?1, project = ?2 WHERE id = ?3",
+                                        params![self.new_text.trim(), proj, id],
+                                    );
+                                    self.reload_data();
+                                    self.sub_mode = AppSubMode::List;
+                                    self.request_focus = true;
+                                }
+                            }
+                            AppSubMode::List => {}
                         }
                     }
                     if ui.button("Cancel").clicked() {
