@@ -564,39 +564,50 @@ impl eframe::App for PvaultApp {
                     .stroke(Stroke::new(1.5, Color32::from_rgb(120, 125, 170)))
                     .inner_margin(egui::Margin::same(0.0))
                     .show(ui, |ui| {
-                        // Tab switcher bar
-                        egui::Frame::none()
-                            .fill(Color32::from_rgb(20, 22, 31))
-                            .rounding(Rounding {
-                                nw: 10.0,
-                                ne: 10.0,
-                                sw: 0.0,
-                                se: 0.0,
-                            })
-                            .inner_margin(egui::Margin::symmetric(14.0, 7.0))
-                            .show(ui, |ui| {
-                                ui.horizontal(|ui| {
-                                    let vault_active = self.tab == TabMode::Vault;
-                                    let v_color = if vault_active { Color32::from_rgb(167, 139, 250) } else { Color32::from_rgb(107, 114, 128) };
-                                    if ui.add(egui::Label::new(RichText::new(format!("⚡ Prompts ({})", self.prompts.len())).color(v_color).font(FontId::proportional(13.0)).strong()).sense(egui::Sense::click())).clicked() {
+                // Top Header: Sleek segmented tab bar (Linear/Apple style)
+                egui::Frame::none()
+                    .fill(Color32::from_rgb(22, 24, 34))
+                    .rounding(Rounding { nw: 10.0, ne: 10.0, sw: 0.0, se: 0.0 })
+                    .inner_margin(egui::Margin::symmetric(16.0, 10.0))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            let vault_active = self.tab == TabMode::Vault;
+                            let v_color = if vault_active { Color32::from_rgb(243, 244, 246) } else { Color32::from_rgb(115, 120, 140) };
+                            let v_bg = if vault_active { Color32::from_rgb(38, 41, 58) } else { Color32::TRANSPARENT };
+
+                            egui::Frame::none()
+                                .fill(v_bg)
+                                .rounding(Rounding::same(5.0))
+                                .inner_margin(egui::Margin::symmetric(10.0, 4.0))
+                                .show(ui, |ui| {
+                                    if ui.add(egui::Label::new(RichText::new(format!("Prompts  {}", self.prompts.len())).color(v_color).font(FontId::proportional(13.0)).strong()).sense(egui::Sense::click())).clicked() {
                                         self.tab = TabMode::Vault;
                                         self.selected_index = 0;
                                     }
+                                });
 
-                                    ui.add_space(16.0);
+                            ui.add_space(4.0);
 
-                                    let queue_active = self.tab == TabMode::Queue;
-                                    let q_color = if queue_active { Color32::from_rgb(56, 189, 248) } else { Color32::from_rgb(107, 114, 128) };
-                                    if ui.add(egui::Label::new(RichText::new(format!("📥 Queue / Jot ({})", self.ideas.len())).color(q_color).font(FontId::proportional(13.0)).strong()).sense(egui::Sense::click())).clicked() {
+                            let queue_active = self.tab == TabMode::Queue;
+                            let q_color = if queue_active { Color32::from_rgb(243, 244, 246) } else { Color32::from_rgb(115, 120, 140) };
+                            let q_bg = if queue_active { Color32::from_rgb(38, 41, 58) } else { Color32::TRANSPARENT };
+
+                            egui::Frame::none()
+                                .fill(q_bg)
+                                .rounding(Rounding::same(5.0))
+                                .inner_margin(egui::Margin::symmetric(10.0, 4.0))
+                                .show(ui, |ui| {
+                                    if ui.add(egui::Label::new(RichText::new(format!("Jot Queue  {}", self.ideas.len())).color(q_color).font(FontId::proportional(13.0)).strong()).sense(egui::Sense::click())).clicked() {
                                         self.tab = TabMode::Queue;
                                         self.selected_index = 0;
                                     }
-
-                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        ui.label(RichText::new("Tab switch").color(Color32::from_rgb(107, 114, 128)).font(FontId::monospace(10.0)));
-                                    });
                                 });
+
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                ui.label(RichText::new("Tab switch  •  Esc close").color(Color32::from_rgb(90, 95, 115)).font(FontId::proportional(11.0)));
                             });
+                        });
+                    });
 
                         ui.separator();
 
@@ -618,39 +629,43 @@ impl PvaultApp {
         prompt_indices: &[usize],
         idea_indices: &[usize],
     ) {
-        // Search bar & Project Tag
+        // Search Input Area: Clean, borderless input with subtle placeholder
         egui::Frame::none()
-            .fill(Color32::from_rgb(22, 23, 34))
-            .inner_margin(egui::Margin::symmetric(14.0, 8.0))
+            .fill(Color32::from_rgb(17, 18, 25))
+            .inner_margin(egui::Margin::symmetric(16.0, 10.0))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     if self.tab == TabMode::Queue {
                         let proj_label = if self.selected_project_idx == 0 {
-                            "📁 all".to_string()
+                            "all".to_string()
                         } else {
-                            format!("📁 {}", self.projects.get(self.selected_project_idx - 1).unwrap_or(&"".to_string()))
+                            self.projects.get(self.selected_project_idx - 1).cloned().unwrap_or_default()
                         };
-                        if ui.add(egui::Label::new(RichText::new(proj_label).color(Color32::from_rgb(56, 189, 248)).font(FontId::monospace(11.0)).strong()).sense(egui::Sense::click())).clicked() {
-                            let num_choices = self.projects.len() + 1;
-                            self.selected_project_idx = (self.selected_project_idx + 1) % num_choices;
-                            self.reload_data();
-                            self.selected_index = 0;
-                        }
-                        ui.add_space(4.0);
-                    } else {
-                        ui.label(RichText::new("⚡").color(Color32::from_rgb(167, 139, 250)).font(FontId::proportional(15.0)));
+                        egui::Frame::none()
+                            .fill(Color32::from_rgb(28, 31, 46))
+                            .rounding(Rounding::same(4.0))
+                            .inner_margin(egui::Margin::symmetric(7.0, 3.0))
+                            .show(ui, |ui| {
+                                if ui.add(egui::Label::new(RichText::new(proj_label).color(Color32::from_rgb(167, 185, 250)).font(FontId::monospace(11.0))).sense(egui::Sense::click())).clicked() {
+                                    let num_choices = self.projects.len() + 1;
+                                    self.selected_project_idx = (self.selected_project_idx + 1) % num_choices;
+                                    self.reload_data();
+                                    self.selected_index = 0;
+                                }
+                            });
+                        ui.add_space(8.0);
                     }
 
                     let hint = match self.tab {
-                        TabMode::Vault => "Search prompts... (Ctrl+N new)",
-                        TabMode::Queue => "Search ideas/tasks... (Ctrl+N jot)",
+                        TabMode::Vault => "Search prompts...",
+                        TabMode::Queue => "Search queue...",
                     };
 
                     let response = ui.add_sized(
-                        [ui.available_width() - 85.0, 24.0],
+                        [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.query)
                             .hint_text(hint)
-                            .font(FontId::proportional(13.5))
+                            .font(FontId::proportional(14.0))
                             .text_color(Color32::from_rgb(243, 244, 246))
                             .frame(false),
                     );
@@ -664,14 +679,12 @@ impl PvaultApp {
                         self.selected_index = 0;
                         self.scroll_to_selected = true;
                     }
-
-                    ui.label(RichText::new("Esc close").color(Color32::from_rgb(107, 114, 128)).font(FontId::monospace(10.0)));
                 });
             });
 
-        ui.separator();
+        ui.add(egui::Separator::default().spacing(0.0));
 
-        let available_height = ui.available_height() - 32.0;
+        let available_height = ui.available_height() - 36.0;
         let mut clicked_prompt_idx = None;
         let mut clicked_idea_idx = None;
 
@@ -686,7 +699,7 @@ impl PvaultApp {
                             let p = &self.prompts[orig_idx];
                             let is_selected = i == self.selected_index;
                             let bg_color = if is_selected {
-                                Color32::from_rgb(38, 41, 58)
+                                Color32::from_rgb(32, 35, 52)
                             } else {
                                 Color32::TRANSPARENT
                             };
@@ -695,7 +708,7 @@ impl PvaultApp {
                             let star_color = if p.fav {
                                 Color32::from_rgb(251, 191, 36)
                             } else {
-                                Color32::from_rgb(75, 85, 99)
+                                Color32::from_rgb(70, 75, 95)
                             };
                             let title = p.title.clone();
                             let clean_snippet: String = p.text
@@ -703,30 +716,29 @@ impl PvaultApp {
                                 .next()
                                 .unwrap_or("")
                                 .chars()
-                                .take(75)
+                                .take(80)
                                 .collect();
-                            let uses_str = format!("{} uses", p.uses);
 
                             let frame_res = egui::Frame::none()
                                 .fill(bg_color)
                                 .rounding(Rounding::same(6.0))
-                                .inner_margin(egui::Margin::symmetric(10.0, 6.0))
+                                .inner_margin(egui::Margin::symmetric(14.0, 7.0))
                                 .show(ui, |ui: &mut egui::Ui| {
                                     ui.horizontal(|ui: &mut egui::Ui| {
-                                        ui.label(RichText::new(star_text).color(star_color).font(FontId::proportional(14.0)));
-                                        ui.add_space(4.0);
+                                        ui.label(RichText::new(star_text).color(star_color).font(FontId::proportional(13.0)));
+                                        ui.add_space(6.0);
                                         ui.vertical(|ui: &mut egui::Ui| {
-                                            ui.horizontal(|ui: &mut egui::Ui| {
-                                                ui.label(RichText::new(title).color(Color32::from_rgb(243, 244, 246)).font(FontId::proportional(13.0)).strong());
-                                                if is_selected {
-                                                    ui.label(RichText::new("↵ copy").color(Color32::from_rgb(167, 139, 250)).font(FontId::monospace(9.0)));
-                                                }
-                                            });
-                                            ui.label(RichText::new(clean_snippet).color(Color32::from_rgb(156, 163, 175)).font(FontId::proportional(11.0)));
+                                            ui.label(RichText::new(title).color(Color32::from_rgb(243, 244, 246)).font(FontId::proportional(13.0)).strong());
+                                            ui.add_space(1.0);
+                                            ui.label(RichText::new(clean_snippet).color(Color32::from_rgb(130, 135, 155)).font(FontId::proportional(11.5)));
                                         });
 
                                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui: &mut egui::Ui| {
-                                            ui.label(RichText::new(uses_str).color(Color32::from_rgb(107, 114, 128)).font(FontId::monospace(10.0)));
+                                            if is_selected {
+                                                ui.label(RichText::new("↵").color(Color32::from_rgb(167, 139, 250)).font(FontId::proportional(12.0)));
+                                            } else {
+                                                ui.label(RichText::new(format!("{}", p.uses)).color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(10.0)));
+                                            }
                                         });
                                     });
                                 });
@@ -744,7 +756,7 @@ impl PvaultApp {
                             let idea = &self.ideas[orig_idx];
                             let is_selected = i == self.selected_index;
                             let bg_color = if is_selected {
-                                Color32::from_rgb(31, 37, 56)
+                                Color32::from_rgb(32, 35, 52)
                             } else {
                                 Color32::TRANSPARENT
                             };
@@ -754,26 +766,34 @@ impl PvaultApp {
                                 .next()
                                 .unwrap_or("")
                                 .chars()
-                                .take(80)
+                                .take(85)
                                 .collect();
                             let proj_tag = if idea.project.is_empty() { "inbox".to_string() } else { idea.project.clone() };
 
                             let frame_res = egui::Frame::none()
                                 .fill(bg_color)
                                 .rounding(Rounding::same(6.0))
-                                .inner_margin(egui::Margin::symmetric(10.0, 6.0))
+                                .inner_margin(egui::Margin::symmetric(14.0, 7.0))
                                 .show(ui, |ui: &mut egui::Ui| {
                                     ui.horizontal(|ui: &mut egui::Ui| {
-                                        ui.label(RichText::new("📌").font(FontId::proportional(12.0)));
-                                        ui.add_space(4.0);
-                                        ui.vertical(|ui: &mut egui::Ui| {
-                                            ui.horizontal(|ui: &mut egui::Ui| {
-                                                ui.label(RichText::new(&proj_tag).color(Color32::from_rgb(56, 189, 248)).font(FontId::monospace(10.0)).strong());
-                                                if is_selected {
-                                                    ui.label(RichText::new("↵ copy & done").color(Color32::from_rgb(248, 113, 113)).font(FontId::monospace(9.0)));
-                                                }
+                                        // Project badge aligned on left
+                                        egui::Frame::none()
+                                            .fill(Color32::from_rgb(26, 29, 42))
+                                            .rounding(Rounding::same(4.0))
+                                            .inner_margin(egui::Margin::symmetric(6.0, 2.0))
+                                            .show(ui, |ui| {
+                                                ui.label(RichText::new(&proj_tag).color(Color32::from_rgb(130, 145, 185)).font(FontId::monospace(10.5)));
                                             });
-                                            ui.label(RichText::new(clean_body).color(Color32::from_rgb(243, 244, 246)).font(FontId::proportional(12.0)));
+
+                                        ui.add_space(8.0);
+
+                                        // Body text
+                                        ui.label(RichText::new(clean_body).color(Color32::from_rgb(235, 237, 242)).font(FontId::proportional(12.5)));
+
+                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui: &mut egui::Ui| {
+                                            if is_selected {
+                                                ui.label(RichText::new("done ↵").color(Color32::from_rgb(248, 113, 113)).font(FontId::monospace(10.0)));
+                                            }
                                         });
                                     });
                                 });
@@ -798,113 +818,110 @@ impl PvaultApp {
             self.consume_idea(orig_idx, true, ctx);
         }
 
-        // Bottom status bar
+        // Bottom status bar: Minimalist Apple/Linear clean footer
         ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
             egui::Frame::none()
-                .fill(Color32::from_rgb(13, 14, 20))
-                .rounding(Rounding {
-                    nw: 0.0,
-                    ne: 0.0,
-                    sw: 10.0,
-                    se: 10.0,
-                })
-                .inner_margin(egui::Margin::symmetric(12.0, 6.0))
+                .fill(Color32::from_rgb(14, 15, 22))
+                .rounding(Rounding { nw: 0.0, ne: 0.0, sw: 10.0, se: 10.0 })
+                .inner_margin(egui::Margin::symmetric(16.0, 8.0))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
                         let hint = match self.tab {
-                            TabMode::Vault => "↵ Copy  •  Ctrl+F Fav  •  Ctrl+N New  •  Tab Switch",
-                            TabMode::Queue => "↵ Copy & Done  •  ⇧↵ Copy (Keep)  •  Ctrl+P Project  •  Ctrl+N Jot",
+                            TabMode::Vault => "↵ copy  •  ^f favorite  •  ^n new",
+                            TabMode::Queue => "↵ copy & done  •  ^p project  •  ^n jot",
                         };
-                        ui.label(RichText::new(hint).color(Color32::from_rgb(107, 114, 128)).font(FontId::monospace(10.0)));
+                        ui.label(RichText::new(hint).color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(10.5)));
                     });
                 });
         });
     }
 
     fn render_create_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        ui.add_space(8.0);
+        ui.add_space(4.0);
         let header = match self.tab {
-            TabMode::Vault => "New Reusable Prompt",
-            TabMode::Queue => "Jot One-Time Idea / Task",
-        };
-        let accent = match self.tab {
-            TabMode::Vault => Color32::from_rgb(167, 139, 250),
-            TabMode::Queue => Color32::from_rgb(56, 189, 248),
+            TabMode::Vault => "New Prompt",
+            TabMode::Queue => "Jot Idea",
         };
 
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(header).color(accent).font(FontId::proportional(15.0)).strong());
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(RichText::new("Esc cancel  •  Ctrl+S save").color(Color32::from_rgb(107, 114, 128)).font(FontId::monospace(10.0)));
-            });
-        });
-        ui.add_space(8.0);
+        egui::Frame::none()
+            .inner_margin(egui::Margin::symmetric(16.0, 10.0))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(header).color(Color32::from_rgb(243, 244, 246)).font(FontId::proportional(15.0)).strong());
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(RichText::new("^s save  •  esc cancel").color(Color32::from_rgb(90, 95, 115)).font(FontId::monospace(10.5)));
+                    });
+                });
 
-        if self.tab == TabMode::Vault {
-            ui.label(RichText::new("Title").color(Color32::from_rgb(156, 163, 175)).font(FontId::proportional(12.0)));
-            ui.add_sized(
-                [ui.available_width(), 26.0],
-                egui::TextEdit::singleline(&mut self.new_title)
-                    .hint_text("Prompt title...")
-                    .font(FontId::proportional(13.0)),
-            );
-            ui.add_space(8.0);
-        } else {
-            ui.label(RichText::new("Project (Optional)").color(Color32::from_rgb(156, 163, 175)).font(FontId::proportional(12.0)));
-            ui.add_sized(
-                [ui.available_width(), 26.0],
-                egui::TextEdit::singleline(&mut self.new_project)
-                    .hint_text("e.g. pvault, godot-game, or empty for general inbox")
-                    .font(FontId::monospace(12.0)),
-            );
-            ui.add_space(8.0);
-        }
+                ui.add_space(10.0);
 
-        ui.label(RichText::new("Content").color(Color32::from_rgb(156, 163, 175)).font(FontId::proportional(12.0)));
-        ui.add_sized(
-            [ui.available_width(), ui.available_height() - 50.0],
-            egui::TextEdit::multiline(&mut self.new_text)
-                .hint_text("Enter text here...")
-                .font(FontId::monospace(12.0)),
-        );
-
-        let mut do_save = false;
-        ctx.input(|i| {
-            if i.modifiers.ctrl && i.key_pressed(Key::S) {
-                do_save = true;
-            }
-        });
-
-        ui.horizontal(|ui| {
-            if ui.button(RichText::new("Save").color(accent)).clicked() || do_save {
                 if self.tab == TabMode::Vault {
-                    if !self.new_title.trim().is_empty() && !self.new_text.trim().is_empty() {
-                        let id = random_id();
-                        let now = now_millis();
-                        let _ = self.conn.execute(
-                            "INSERT INTO prompts (id, title, text, fav, uses, created, updated) VALUES (?1, ?2, ?3, 1, 0, ?4, ?4)",
-                            params![id, self.new_title.trim(), self.new_text.trim(), now],
-                        );
-                        self.reload_data();
+                    ui.add_sized(
+                        [ui.available_width(), 26.0],
+                        egui::TextEdit::singleline(&mut self.new_title)
+                            .hint_text("Title")
+                            .font(FontId::proportional(13.5))
+                            .text_color(Color32::from_rgb(243, 244, 246)),
+                    );
+                    ui.add_space(8.0);
+                } else {
+                    ui.add_sized(
+                        [ui.available_width(), 26.0],
+                        egui::TextEdit::singleline(&mut self.new_project)
+                            .hint_text("Project (optional, e.g. pvault)")
+                            .font(FontId::proportional(13.0))
+                            .text_color(Color32::from_rgb(243, 244, 246)),
+                    );
+                    ui.add_space(8.0);
+                }
+
+                ui.add_sized(
+                    [ui.available_width(), ui.available_height() - 48.0],
+                    egui::TextEdit::multiline(&mut self.new_text)
+                        .hint_text("Prompt content...")
+                        .font(FontId::monospace(12.0))
+                        .text_color(Color32::from_rgb(243, 244, 246)),
+                );
+
+                let mut do_save = false;
+                ctx.input(|i| {
+                    if i.modifiers.ctrl && i.key_pressed(Key::S) {
+                        do_save = true;
+                    }
+                });
+
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    if ui.button(RichText::new("Save").color(Color32::from_rgb(167, 139, 250))).clicked() || do_save {
+                        if self.tab == TabMode::Vault {
+                            if !self.new_title.trim().is_empty() && !self.new_text.trim().is_empty() {
+                                let id = random_id();
+                                let now = now_millis();
+                                let _ = self.conn.execute(
+                                    "INSERT INTO prompts (id, title, text, fav, uses, created, updated) VALUES (?1, ?2, ?3, 1, 0, ?4, ?4)",
+                                    params![id, self.new_title.trim(), self.new_text.trim(), now],
+                                );
+                                self.reload_data();
+                                self.sub_mode = AppSubMode::List;
+                                self.request_focus = true;
+                            }
+                        } else if !self.new_text.trim().is_empty() {
+                            let now = chrono::Utc::now().to_rfc3339();
+                            let proj = self.new_project.trim();
+                            let _ = self.conn.execute(
+                                "INSERT INTO ideas (body, project, status, created_at) VALUES (?1, ?2, 'inbox', ?3)",
+                                params![self.new_text.trim(), proj, now],
+                            );
+                            self.reload_data();
+                            self.sub_mode = AppSubMode::List;
+                            self.request_focus = true;
+                        }
+                    }
+                    if ui.button("Cancel").clicked() {
                         self.sub_mode = AppSubMode::List;
                         self.request_focus = true;
                     }
-                } else if !self.new_text.trim().is_empty() {
-                    let now = chrono::Utc::now().to_rfc3339();
-                    let proj = self.new_project.trim();
-                    let _ = self.conn.execute(
-                        "INSERT INTO ideas (body, project, status, created_at) VALUES (?1, ?2, 'inbox', ?3)",
-                        params![self.new_text.trim(), proj, now],
-                    );
-                    self.reload_data();
-                    self.sub_mode = AppSubMode::List;
-                    self.request_focus = true;
-                }
-            }
-            if ui.button("Cancel").clicked() {
-                self.sub_mode = AppSubMode::List;
-                self.request_focus = true;
-            }
-        });
+                });
+            });
     }
 }
