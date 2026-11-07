@@ -321,6 +321,7 @@ struct PvaultApp {
     new_title: String,
     new_text: String,
     new_project: String,
+    suggested_proj_idx: usize,
     matcher: SkimMatcherV2,
     request_focus: bool,
     scroll_to_selected: bool,
@@ -347,6 +348,7 @@ impl PvaultApp {
             new_title: String::new(),
             new_text: String::new(),
             new_project: String::new(),
+            suggested_proj_idx: 0,
             matcher: SkimMatcherV2::default(),
             request_focus: true,
             scroll_to_selected: false,
@@ -562,6 +564,7 @@ impl eframe::App for PvaultApp {
             } else {
                 String::new()
             };
+            self.suggested_proj_idx = 0;
             self.request_focus = true;
         }
 
@@ -1026,8 +1029,8 @@ impl PvaultApp {
                         [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.new_project)
                             .id(proj_id)
-                            .hint_text("Search or type project (e.g. pvault, FreshOla)...")
-                            .font(FontId::proportional(13.0))
+                            .hint_text("Type project or use ↑/↓ to pick from pj...")
+                            .font(FontId::proportional(13.5))
                             .text_color(Color32::from_rgb(243, 244, 246)),
                     );
 
@@ -1036,7 +1039,7 @@ impl PvaultApp {
                         self.request_focus = false;
                     }
 
-                    // Matching suggestions from pj projects
+                    // Matching suggestions from pj projects (fzf vertical list style)
                     let query = self.new_project.trim().to_lowercase();
                     let matches: Vec<&String> = self
                         .projects
@@ -1048,46 +1051,81 @@ impl PvaultApp {
                                 p.to_lowercase().contains(&query)
                             }
                         })
-                        .take(6)
+                        .take(5)
                         .collect();
 
-                    // Keep suggestions visible whenever user is in this form or matches exist
+                    let num_matches = matches.len();
+
+                    // Arrow key navigation when focused on project search
+                    if proj_res.has_focus() {
+                        if ctx.input(|i| i.key_pressed(Key::ArrowDown)) && num_matches > 0 {
+                            self.suggested_proj_idx = (self.suggested_proj_idx + 1) % num_matches;
+                        }
+                        if ctx.input(|i| i.key_pressed(Key::ArrowUp)) && num_matches > 0 {
+                            self.suggested_proj_idx = if self.suggested_proj_idx == 0 {
+                                num_matches - 1
+                            } else {
+                                self.suggested_proj_idx - 1
+                            };
+                        }
+                    }
+
+                    if self.suggested_proj_idx >= num_matches {
+                        self.suggested_proj_idx = 0;
+                    }
+
+                    // Render vertical dropdown list like fzf
+                    let mut pick_project = None;
                     if !matches.is_empty() {
-                        ui.horizontal_wrapped(|ui| {
-                            for p in matches {
-                                let is_active = self.new_project.trim() == p.as_str();
-                                let bg = if is_active {
-                                    Color32::from_rgb(55, 60, 95)
-                                } else {
-                                    Color32::from_rgb(28, 31, 46)
-                                };
-                                let text_color = if is_active {
-                                    Color32::from_rgb(255, 255, 255)
-                                } else {
-                                    Color32::from_rgb(160, 175, 220)
-                                };
+                        egui::Frame::none()
+                            .fill(Color32::from_rgb(20, 22, 32))
+                            .rounding(Rounding::same(6.0))
+                            .stroke(Stroke::new(1.0, Color32::from_rgb(42, 45, 66)))
+                            .inner_margin(egui::Margin::symmetric(6.0, 4.0))
+                            .show(ui, |ui| {
+                                for (idx, &p) in matches.iter().enumerate() {
+                                    let is_active = idx == self.suggested_proj_idx;
+                                    let bg = if is_active {
+                                        Color32::from_rgb(42, 46, 70)
+                                    } else {
+                                        Color32::TRANSPARENT
+                                    };
+                                    let text_color = if is_active {
+                                        Color32::from_rgb(255, 255, 255)
+                                    } else {
+                                        Color32::from_rgb(160, 165, 190)
+                                    };
 
-                                let btn = egui::Button::new(RichText::new(p).color(text_color).font(FontId::monospace(11.0)))
-                                    .fill(bg)
-                                    .rounding(Rounding::same(4.0))
-                                    .stroke(Stroke::NONE);
+                                    let prefix = if is_active { "▶ " } else { "  " };
 
-                                if ui.add(btn).clicked() {
-                                    self.new_project = p.clone();
-                                    ctx.memory_mut(|m| m.request_focus(content_id));
+                                    let row = egui::Frame::none()
+                                        .fill(bg)
+                                        .rounding(Rounding::same(4.0))
+                                        .inner_margin(egui::Margin::symmetric(8.0, 4.0))
+                                        .show(ui, |ui| {
+                                            ui.horizontal(|ui| {
+                                                ui.label(RichText::new(prefix).color(Color32::from_rgb(167, 139, 250)).font(FontId::monospace(11.0)));
+                                                ui.label(RichText::new(p).color(text_color).font(FontId::monospace(12.0)));
+                                            });
+                                        });
+
+                                    if row.response.clicked() {
+                                        pick_project = Some(p.clone());
+                                    }
                                 }
-                            }
-                        });
+                            });
                         ui.add_space(4.0);
                     }
 
-                    // Pressing Enter in singleline project moves focus directly to content, auto-selecting top match if empty
-                    if proj_res.lost_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
-                        if !self.new_project.trim().is_empty() {
-                            // If typed text matches prefix of first suggestion, complete it
-                            if let Some(first_match) = self.projects.iter().find(|p| p.to_lowercase().starts_with(&self.new_project.trim().to_lowercase())) {
-                                self.new_project = first_match.clone();
-                            }
+                    if let Some(picked) = pick_project {
+                        self.new_project = picked;
+                        ctx.memory_mut(|m| m.request_focus(content_id));
+                    }
+
+                    // Pressing Enter in project input: selects the highlighted fzf match (or custom typed text) and advances
+                    if proj_res.has_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
+                        if let Some(&selected_match) = matches.get(self.suggested_proj_idx) {
+                            self.new_project = selected_match.clone();
                         }
                         ctx.memory_mut(|m| m.request_focus(content_id));
                     }
