@@ -656,9 +656,13 @@ impl eframe::App for PvaultApp {
                                 .rounding(Rounding::same(5.0))
                                 .inner_margin(egui::Margin::symmetric(10.0, 4.0))
                                 .show(ui, |ui| {
-                                    if ui.add(egui::Label::new(RichText::new(format!("Prompts  {}", self.prompts.len())).color(v_color).font(FontId::proportional(14.0)).strong()).sense(egui::Sense::click())).clicked() {
-                                        self.tab = TabMode::Vault;
-                                        self.selected_index = 0;
+                                    if !in_form {
+                                        if ui.add(egui::Label::new(RichText::new(format!("Prompts  {}", self.prompts.len())).color(v_color).font(FontId::proportional(14.0)).strong()).sense(egui::Sense::click())).clicked() {
+                                            self.tab = TabMode::Vault;
+                                            self.selected_index = 0;
+                                        }
+                                    } else {
+                                        ui.label(RichText::new(format!("Prompts  {}", self.prompts.len())).color(v_color).font(FontId::proportional(14.0)).strong());
                                     }
                                 });
 
@@ -673,14 +677,23 @@ impl eframe::App for PvaultApp {
                                 .rounding(Rounding::same(5.0))
                                 .inner_margin(egui::Margin::symmetric(10.0, 4.0))
                                 .show(ui, |ui| {
-                                    if ui.add(egui::Label::new(RichText::new(format!("Jot Queue  {}", self.ideas.len())).color(q_color).font(FontId::proportional(14.0)).strong()).sense(egui::Sense::click())).clicked() {
-                                        self.tab = TabMode::Queue;
-                                        self.selected_index = 0;
+                                    if !in_form {
+                                        if ui.add(egui::Label::new(RichText::new(format!("Jot Queue  {}", self.ideas.len())).color(q_color).font(FontId::proportional(14.0)).strong()).sense(egui::Sense::click())).clicked() {
+                                            self.tab = TabMode::Queue;
+                                            self.selected_index = 0;
+                                        }
+                                    } else {
+                                        ui.label(RichText::new(format!("Jot Queue  {}", self.ideas.len())).color(q_color).font(FontId::proportional(14.0)).strong());
                                     }
                                 });
 
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.label(RichText::new("Tab switch  •  Esc close").color(Color32::from_rgb(90, 95, 115)).font(FontId::proportional(12.0)));
+                                let hint = if in_form {
+                                    "^s save  •  esc cancel"
+                                } else {
+                                    "Tab switch  •  Esc close"
+                                };
+                                ui.label(RichText::new(hint).color(Color32::from_rgb(90, 95, 115)).font(FontId::proportional(12.0)));
                             });
                         });
                     });
