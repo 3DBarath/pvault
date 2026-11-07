@@ -804,6 +804,12 @@ impl PvaultApp {
         ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
             egui::Frame::none()
                 .fill(Color32::from_rgb(13, 14, 20))
+                .rounding(Rounding {
+                    nw: 0.0,
+                    ne: 0.0,
+                    sw: 10.0,
+                    se: 10.0,
+                })
                 .inner_margin(egui::Margin::symmetric(12.0, 6.0))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
