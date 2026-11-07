@@ -932,35 +932,80 @@ impl PvaultApp {
 
                 ui.add_space(10.0);
 
+                let content_id = ui.make_persistent_id("content_editor_area");
+                let mut focus_content = false;
+
                 if self.tab == TabMode::Vault {
-                    ui.add_sized(
+                    let title_res = ui.add_sized(
                         [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.new_title)
                             .hint_text("Title")
                             .font(FontId::proportional(13.5))
                             .text_color(Color32::from_rgb(243, 244, 246)),
                     );
+
+                    if self.request_focus {
+                        title_res.request_focus();
+                        self.request_focus = false;
+                    }
+
+                    // Pressing Enter in title moves to content
+                    if title_res.has_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
+                        focus_content = true;
+                    }
+
                     ui.add_space(8.0);
                 } else {
-                    ui.add_sized(
+                    let proj_res = ui.add_sized(
                         [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.new_project)
                             .hint_text("Project (optional, e.g. pvault)")
                             .font(FontId::proportional(13.0))
                             .text_color(Color32::from_rgb(243, 244, 246)),
                     );
+
+                    if self.request_focus {
+                        proj_res.request_focus();
+                        self.request_focus = false;
+                    }
+
+                    // Pressing Enter in project moves to content
+                    if proj_res.has_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
+                        focus_content = true;
+                    }
+
                     ui.add_space(8.0);
                 }
 
-                ui.add_sized(
+                let text_res = ui.add_sized(
                     [ui.available_width(), ui.available_height() - 48.0],
                     egui::TextEdit::multiline(&mut self.new_text)
+                        .id(content_id)
                         .hint_text("Prompt content...")
                         .font(FontId::monospace(12.0))
                         .text_color(Color32::from_rgb(243, 244, 246)),
                 );
 
+                if focus_content {
+                    text_res.request_focus();
+                }
+
+                // In the multiline editor: Enter saves/submits, Shift+Enter inserts a newline
                 let mut do_save = false;
+                if text_res.has_focus() {
+                    ctx.input(|i| {
+                        if i.key_pressed(Key::Enter) {
+                            if i.modifiers.shift {
+                                // Add newline on Shift+Enter
+                                self.new_text.push('\n');
+                            } else {
+                                // Plain Enter saves
+                                do_save = true;
+                            }
+                        }
+                    });
+                }
+
                 ctx.input(|i| {
                     if i.modifiers.ctrl && i.key_pressed(Key::S) {
                         do_save = true;
