@@ -1043,6 +1043,34 @@ impl PvaultApp {
 
                     let num_matches = matches.len();
 
+                    let is_proj_focused = ctx.memory(|m| m.has_focus(proj_id));
+
+                    // Keyboard navigation and Enter BEFORE rendering the TextEdit so state updates take effect this frame
+                    let mut enter_pressed = false;
+                    if is_proj_focused {
+                        if ctx.input(|i| i.key_pressed(Key::ArrowDown)) && num_matches > 0 {
+                            self.suggested_proj_idx = (self.suggested_proj_idx + 1) % num_matches;
+                        }
+                        if ctx.input(|i| i.key_pressed(Key::ArrowUp)) && num_matches > 0 {
+                            self.suggested_proj_idx = if self.suggested_proj_idx == 0 {
+                                num_matches - 1
+                            } else {
+                                self.suggested_proj_idx - 1
+                            };
+                        }
+                        if ctx.input(|i| i.key_pressed(Key::Enter)) {
+                            enter_pressed = true;
+                            if let Some(selected_match) = matches.get(self.suggested_proj_idx) {
+                                self.new_project = selected_match.clone();
+                            }
+                            ctx.memory_mut(|m| m.request_focus(content_id));
+                        }
+                    }
+
+                    if self.suggested_proj_idx >= num_matches {
+                        self.suggested_proj_idx = 0;
+                    }
+
                     let proj_res = ui.add_sized(
                         [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.new_project)
@@ -1057,27 +1085,9 @@ impl PvaultApp {
                         self.request_focus = false;
                     }
 
-                    // Arrow navigation when typing project
-                    if proj_res.has_focus() {
-                        if ctx.input(|i| i.key_pressed(Key::ArrowDown)) && num_matches > 0 {
-                            self.suggested_proj_idx = (self.suggested_proj_idx + 1) % num_matches;
-                        }
-                        if ctx.input(|i| i.key_pressed(Key::ArrowUp)) && num_matches > 0 {
-                            self.suggested_proj_idx = if self.suggested_proj_idx == 0 {
-                                num_matches - 1
-                            } else {
-                                self.suggested_proj_idx - 1
-                            };
-                        }
-                    }
-
-                    if self.suggested_proj_idx >= num_matches {
-                        self.suggested_proj_idx = 0;
-                    }
-
                     // Render compact suggestions popup/container
                     let mut pick_project = None;
-                    if proj_res.has_focus() && !matches.is_empty() {
+                    if is_proj_focused && !matches.is_empty() && !enter_pressed {
                         egui::Frame::none()
                             .fill(Color32::from_rgb(20, 22, 32))
                             .rounding(Rounding::same(6.0))
@@ -1126,14 +1136,6 @@ impl PvaultApp {
 
                     if let Some(picked) = pick_project {
                         self.new_project = picked;
-                        ctx.memory_mut(|m| m.request_focus(content_id));
-                    }
-
-                    // Enter on project field: lock choice and jump focus
-                    if proj_res.has_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
-                        if let Some(selected_match) = matches.get(self.suggested_proj_idx) {
-                            self.new_project = selected_match.clone();
-                        }
                         ctx.memory_mut(|m| m.request_focus(content_id));
                     }
 
