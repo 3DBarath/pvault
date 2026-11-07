@@ -1,0 +1,16 @@
+[package]
+name = "pvault"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = { version = "0.29", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+arboard = "3.4"
+interprocess = "2.2"
+fuzzy-matcher = "0.3"
+rand = "0.8"
+rusqlite = { version = "0.31", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5.0"
