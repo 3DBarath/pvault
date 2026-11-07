@@ -934,7 +934,6 @@ impl PvaultApp {
                 ui.add_space(10.0);
 
                 let content_id = ui.make_persistent_id("content_editor_area");
-                let mut focus_content = false;
 
                 if self.tab == TabMode::Vault {
                     let title_res = ui.add_sized(
@@ -950,9 +949,9 @@ impl PvaultApp {
                         self.request_focus = false;
                     }
 
-                    // Pressing Enter in title moves to content
-                    if title_res.has_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
-                        focus_content = true;
+                    // Pressing Enter in singleline title or Tab moves focus directly to content
+                    if title_res.lost_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
+                        ctx.memory_mut(|m| m.request_focus(content_id));
                     }
 
                     ui.add_space(8.0);
@@ -970,26 +969,29 @@ impl PvaultApp {
                         self.request_focus = false;
                     }
 
-                    // Pressing Enter in project moves to content
-                    if proj_res.has_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
-                        focus_content = true;
+                    // Pressing Enter in singleline project moves focus directly to content
+                    if proj_res.lost_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
+                        ctx.memory_mut(|m| m.request_focus(content_id));
                     }
 
                     ui.add_space(8.0);
                 }
 
-                let text_res = ui.add_sized(
-                    [ui.available_width(), ui.available_height() - 48.0],
-                    egui::TextEdit::multiline(&mut self.new_text)
-                        .id(content_id)
-                        .hint_text("Prompt content...")
-                        .font(FontId::monospace(12.0))
-                        .text_color(Color32::from_rgb(243, 244, 246)),
-                );
-
-                if focus_content {
-                    text_res.request_focus();
-                }
+                // Wrap prompt content in ScrollArea so long multiline text has a dedicated vertical scrollbar
+                egui::ScrollArea::vertical()
+                    .id_source("form_content_scroll")
+                    .max_height(ui.available_height() - 44.0)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.add_sized(
+                            [ui.available_width(), (ui.available_height() - 4.0).max(180.0)],
+                            egui::TextEdit::multiline(&mut self.new_text)
+                                .id(content_id)
+                                .hint_text("Prompt content...")
+                                .font(FontId::monospace(12.5))
+                                .text_color(Color32::from_rgb(243, 244, 246)),
+                        );
+                    });
 
                 // In the multiline editor: Enter inserts newline as normal. Ctrl+S or Ctrl+Enter saves.
                 let mut do_save = false;
