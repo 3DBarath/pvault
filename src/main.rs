@@ -580,7 +580,7 @@ impl eframe::App for PvaultApp {
                                 .rounding(Rounding::same(5.0))
                                 .inner_margin(egui::Margin::symmetric(10.0, 4.0))
                                 .show(ui, |ui| {
-                                    if ui.add(egui::Label::new(RichText::new(format!("Prompts  {}", self.prompts.len())).color(v_color).font(FontId::proportional(13.0)).strong()).sense(egui::Sense::click())).clicked() {
+                                    if ui.add(egui::Label::new(RichText::new(format!("Prompts  {}", self.prompts.len())).color(v_color).font(FontId::proportional(14.0)).strong()).sense(egui::Sense::click())).clicked() {
                                         self.tab = TabMode::Vault;
                                         self.selected_index = 0;
                                     }
@@ -597,14 +597,14 @@ impl eframe::App for PvaultApp {
                                 .rounding(Rounding::same(5.0))
                                 .inner_margin(egui::Margin::symmetric(10.0, 4.0))
                                 .show(ui, |ui| {
-                                    if ui.add(egui::Label::new(RichText::new(format!("Jot Queue  {}", self.ideas.len())).color(q_color).font(FontId::proportional(13.0)).strong()).sense(egui::Sense::click())).clicked() {
+                                    if ui.add(egui::Label::new(RichText::new(format!("Jot Queue  {}", self.ideas.len())).color(q_color).font(FontId::proportional(14.0)).strong()).sense(egui::Sense::click())).clicked() {
                                         self.tab = TabMode::Queue;
                                         self.selected_index = 0;
                                     }
                                 });
 
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.label(RichText::new("Tab switch  •  Esc close").color(Color32::from_rgb(90, 95, 115)).font(FontId::proportional(11.0)));
+                                ui.label(RichText::new("Tab switch  •  Esc close").color(Color32::from_rgb(90, 95, 115)).font(FontId::proportional(12.0)));
                             });
                         });
                     });
@@ -665,7 +665,7 @@ impl PvaultApp {
                         [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.query)
                             .hint_text(hint)
-                            .font(FontId::proportional(14.0))
+                            .font(FontId::proportional(15.0))
                             .text_color(Color32::from_rgb(243, 244, 246))
                             .frame(false),
                     );
@@ -725,20 +725,21 @@ impl PvaultApp {
                                 .inner_margin(egui::Margin::symmetric(14.0, 7.0))
                                 .show(ui, |ui: &mut egui::Ui| {
                                     ui.horizontal(|ui: &mut egui::Ui| {
-                                        ui.label(RichText::new(star_text).color(star_color).font(FontId::proportional(13.0)));
+                                        ui.label(RichText::new(star_text).color(star_color).font(FontId::proportional(14.0)));
                                         ui.add_space(6.0);
                                         ui.vertical(|ui: &mut egui::Ui| {
-                                            ui.label(RichText::new(title).color(Color32::from_rgb(243, 244, 246)).font(FontId::proportional(13.0)).strong());
+                                            ui.label(RichText::new(title).color(Color32::from_rgb(243, 244, 246)).font(FontId::proportional(14.0)).strong());
                                             ui.add_space(1.0);
-                                            ui.label(RichText::new(clean_snippet).color(Color32::from_rgb(130, 135, 155)).font(FontId::proportional(11.5)));
+                                            ui.label(RichText::new(clean_snippet).color(Color32::from_rgb(130, 135, 155)).font(FontId::proportional(12.5)));
                                         });
 
                                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui: &mut egui::Ui| {
-                                            if is_selected {
-                                                ui.label(RichText::new("↵").color(Color32::from_rgb(167, 139, 250)).font(FontId::proportional(12.0)));
+                                            let color = if is_selected {
+                                                Color32::from_rgb(167, 139, 250)
                                             } else {
-                                                ui.label(RichText::new(format!("{}", p.uses)).color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(10.0)));
-                                            }
+                                                Color32::from_rgb(90, 95, 115)
+                                            };
+                                            ui.label(RichText::new(format!("{}", p.uses)).color(color).font(FontId::monospace(11.0)));
                                         });
                                     });
                                 });
@@ -782,17 +783,17 @@ impl PvaultApp {
                                             .rounding(Rounding::same(4.0))
                                             .inner_margin(egui::Margin::symmetric(6.0, 2.0))
                                             .show(ui, |ui| {
-                                                ui.label(RichText::new(&proj_tag).color(Color32::from_rgb(130, 145, 185)).font(FontId::monospace(10.5)));
+                                                ui.label(RichText::new(&proj_tag).color(Color32::from_rgb(130, 145, 185)).font(FontId::monospace(11.5)));
                                             });
 
                                         ui.add_space(8.0);
 
                                         // Body text
-                                        ui.label(RichText::new(clean_body).color(Color32::from_rgb(235, 237, 242)).font(FontId::proportional(12.5)));
+                                        ui.label(RichText::new(clean_body).color(Color32::from_rgb(235, 237, 242)).font(FontId::proportional(13.5)));
 
                                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui: &mut egui::Ui| {
                                             if is_selected {
-                                                ui.label(RichText::new("done ↵").color(Color32::from_rgb(248, 113, 113)).font(FontId::monospace(10.0)));
+                                                ui.label(RichText::new("done ↵").color(Color32::from_rgb(248, 113, 113)).font(FontId::monospace(11.0)));
                                             }
                                         });
                                     });
@@ -830,7 +831,7 @@ impl PvaultApp {
                             TabMode::Vault => "↵ copy  •  ^f favorite  •  ^n new",
                             TabMode::Queue => "↵ copy & done  •  ^p project  •  ^n jot",
                         };
-                        ui.label(RichText::new(hint).color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(10.5)));
+                        ui.label(RichText::new(hint).color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.5)));
                     });
                 });
         });
