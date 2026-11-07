@@ -184,16 +184,44 @@ fn load_ideas(conn: &Connection, project_filter: Option<&str>) -> Vec<Idea> {
     }
 }
 
+fn load_pj_projects() -> Vec<String> {
+    let base = dirs::data_local_dir().unwrap_or_else(|| {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        PathBuf::from(home).join(".local/share")
+    });
+    let pj_file = base.join("pj").join("projects");
+    if let Ok(content) = fs::read_to_string(pj_file) {
+        content
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .filter_map(|l| {
+                PathBuf::from(l)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.to_string())
+            })
+            .collect()
+    } else {
+        Vec::new()
+    }
+}
+
 fn load_distinct_projects(conn: &Connection) -> Vec<String> {
+    let mut projects = load_pj_projects();
+
     let mut stmt = match conn.prepare("SELECT DISTINCT project FROM ideas WHERE status = 'inbox' AND project != '' ORDER BY project ASC") {
         Ok(s) => s,
-        Err(_) => return Vec::new(),
+        Err(_) => return projects,
     };
-    let rows = stmt.query_map([], |r| r.get::<_, String>(0));
-    match rows {
-        Ok(iter) => iter.flatten().collect(),
-        Err(_) => Vec::new(),
+    if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
+        for p in rows.flatten() {
+            if !projects.contains(&p) {
+                projects.push(p);
+            }
+        }
     }
+    projects
 }
 
 fn now_millis() -> u64 {
@@ -998,7 +1026,7 @@ impl PvaultApp {
                         [ui.available_width(), 26.0],
                         egui::TextEdit::singleline(&mut self.new_project)
                             .id(proj_id)
-                            .hint_text("Project (optional, e.g. pvault)")
+                            .hint_text("Search or type project (e.g. pvault, FreshOla)...")
                             .font(FontId::proportional(13.0))
                             .text_color(Color32::from_rgb(243, 244, 246)),
                     );
@@ -1006,6 +1034,53 @@ impl PvaultApp {
                     if self.request_focus {
                         proj_res.request_focus();
                         self.request_focus = false;
+                    }
+
+                    // Matching suggestions from pj projects
+                    let query = self.new_project.trim().to_lowercase();
+                    let matches: Vec<&String> = self
+                        .projects
+                        .iter()
+                        .filter(|p| {
+                            if query.is_empty() {
+                                true
+                            } else {
+                                p.to_lowercase().contains(&query)
+                            }
+                        })
+                        .take(6)
+                        .collect();
+
+                    if proj_res.has_focus() && !matches.is_empty() {
+                        ui.horizontal_wrapped(|ui| {
+                            for p in matches {
+                                let is_active = self.new_project.trim() == p.as_str();
+                                let bg = if is_active {
+                                    Color32::from_rgb(45, 50, 75)
+                                } else {
+                                    Color32::from_rgb(26, 29, 42)
+                                };
+                                let text_color = if is_active {
+                                    Color32::from_rgb(243, 244, 246)
+                                } else {
+                                    Color32::from_rgb(140, 155, 195)
+                                };
+
+                                let pill = egui::Frame::none()
+                                    .fill(bg)
+                                    .rounding(Rounding::same(4.0))
+                                    .inner_margin(egui::Margin::symmetric(7.0, 3.0))
+                                    .show(ui, |ui| {
+                                        ui.label(RichText::new(p).color(text_color).font(FontId::monospace(11.0)));
+                                    });
+
+                                if pill.response.clicked() {
+                                    self.new_project = p.clone();
+                                    ctx.memory_mut(|m| m.request_focus(content_id));
+                                }
+                            }
+                        });
+                        ui.add_space(4.0);
                     }
 
                     // Pressing Enter in singleline project moves focus directly to content
