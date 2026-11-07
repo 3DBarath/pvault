@@ -1051,30 +1051,28 @@ impl PvaultApp {
                         .take(6)
                         .collect();
 
-                    if proj_res.has_focus() && !matches.is_empty() {
+                    // Keep suggestions visible whenever user is in this form or matches exist
+                    if !matches.is_empty() {
                         ui.horizontal_wrapped(|ui| {
                             for p in matches {
                                 let is_active = self.new_project.trim() == p.as_str();
                                 let bg = if is_active {
-                                    Color32::from_rgb(45, 50, 75)
+                                    Color32::from_rgb(55, 60, 95)
                                 } else {
-                                    Color32::from_rgb(26, 29, 42)
+                                    Color32::from_rgb(28, 31, 46)
                                 };
                                 let text_color = if is_active {
-                                    Color32::from_rgb(243, 244, 246)
+                                    Color32::from_rgb(255, 255, 255)
                                 } else {
-                                    Color32::from_rgb(140, 155, 195)
+                                    Color32::from_rgb(160, 175, 220)
                                 };
 
-                                let pill = egui::Frame::none()
+                                let btn = egui::Button::new(RichText::new(p).color(text_color).font(FontId::monospace(11.0)))
                                     .fill(bg)
                                     .rounding(Rounding::same(4.0))
-                                    .inner_margin(egui::Margin::symmetric(7.0, 3.0))
-                                    .show(ui, |ui| {
-                                        ui.label(RichText::new(p).color(text_color).font(FontId::monospace(11.0)));
-                                    });
+                                    .stroke(Stroke::NONE);
 
-                                if pill.response.clicked() {
+                                if ui.add(btn).clicked() {
                                     self.new_project = p.clone();
                                     ctx.memory_mut(|m| m.request_focus(content_id));
                                 }
@@ -1083,8 +1081,14 @@ impl PvaultApp {
                         ui.add_space(4.0);
                     }
 
-                    // Pressing Enter in singleline project moves focus directly to content
+                    // Pressing Enter in singleline project moves focus directly to content, auto-selecting top match if empty
                     if proj_res.lost_focus() && ctx.input(|i| i.key_pressed(Key::Enter)) {
+                        if !self.new_project.trim().is_empty() {
+                            // If typed text matches prefix of first suggestion, complete it
+                            if let Some(first_match) = self.projects.iter().find(|p| p.to_lowercase().starts_with(&self.new_project.trim().to_lowercase())) {
+                                self.new_project = first_match.clone();
+                            }
+                        }
                         ctx.memory_mut(|m| m.request_focus(content_id));
                     }
 
