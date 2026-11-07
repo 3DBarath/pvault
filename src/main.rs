@@ -1071,67 +1071,47 @@ impl PvaultApp {
                         self.suggested_proj_idx = 0;
                     }
 
-                    let proj_res = ui.add_sized(
-                        [ui.available_width(), 26.0],
-                        egui::TextEdit::singleline(&mut self.new_project)
-                            .id(proj_id)
-                            .hint_text("Search or type project from pj...")
-                            .font(FontId::proportional(13.5))
-                            .text_color(Color32::from_rgb(243, 244, 246)),
-                    );
+                    let proj_res = ui.horizontal(|ui| {
+                        ui.label(RichText::new("📁").font(FontId::proportional(12.0)));
+                        ui.add_sized(
+                            [ui.available_width(), 26.0],
+                            egui::TextEdit::singleline(&mut self.new_project)
+                                .id(proj_id)
+                                .hint_text("Project (optional, e.g. pvault)...")
+                                .font(FontId::proportional(13.5))
+                                .text_color(Color32::from_rgb(243, 244, 246)),
+                        )
+                    }).inner;
 
                     if self.request_focus {
                         proj_res.request_focus();
                         self.request_focus = false;
                     }
 
-                    // Render compact suggestions popup/container
+                    // Ghost auto-complete hint on the right if user typed a partial match
                     let mut pick_project = None;
-                    if is_proj_focused && !matches.is_empty() && !enter_pressed {
-                        egui::Frame::none()
-                            .fill(Color32::from_rgb(20, 22, 32))
-                            .rounding(Rounding::same(6.0))
-                            .stroke(Stroke::new(1.0, Color32::from_rgb(42, 45, 66)))
-                            .inner_margin(egui::Margin::symmetric(6.0, 3.0))
-                            .show(ui, |ui| {
-                                for (idx, p) in matches.iter().enumerate() {
-                                    let is_active = idx == self.suggested_proj_idx;
-                                    let bg = if is_active {
-                                        Color32::from_rgb(42, 46, 70)
-                                    } else {
-                                        Color32::TRANSPARENT
-                                    };
-                                    let text_color = if is_active {
-                                        Color32::from_rgb(255, 255, 255)
-                                    } else {
-                                        Color32::from_rgb(160, 165, 190)
-                                    };
+                    if is_proj_focused && !self.new_project.trim().is_empty() && !matches.is_empty() && !enter_pressed {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("match:").color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(11.0)));
+                            if let Some(top_match) = matches.get(self.suggested_proj_idx) {
+                                let btn = egui::Button::new(
+                                    RichText::new(format!("{} (↵ to apply)", top_match))
+                                        .color(Color32::from_rgb(167, 185, 250))
+                                        .font(FontId::monospace(11.5))
+                                )
+                                .fill(Color32::from_rgb(26, 29, 44))
+                                .rounding(Rounding::same(4.0))
+                                .stroke(Stroke::NONE);
 
-                                    let prefix = if is_active { "▶ " } else { "  " };
-
-                                    let mut layout_job = egui::text::LayoutJob::default();
-                                    layout_job.append(prefix, 0.0, egui::TextFormat {
-                                        font_id: FontId::monospace(11.0),
-                                        color: Color32::from_rgb(167, 139, 250),
-                                        ..Default::default()
-                                    });
-                                    layout_job.append(p, 0.0, egui::TextFormat {
-                                        font_id: FontId::monospace(12.0),
-                                        color: text_color,
-                                        ..Default::default()
-                                    });
-
-                                    let btn = egui::Button::new(layout_job)
-                                        .fill(bg)
-                                        .rounding(Rounding::same(4.0))
-                                        .stroke(Stroke::NONE);
-
-                                    if ui.add_sized([ui.available_width(), 20.0], btn).clicked() {
-                                        pick_project = Some(p.clone());
-                                    }
+                                if ui.add(btn).clicked() {
+                                    pick_project = Some(top_match.clone());
                                 }
-                            });
-                        ui.add_space(4.0);
+                            }
+                            if num_matches > 1 {
+                                ui.label(RichText::new(format!("+{} more (↑/↓)", num_matches - 1)).color(Color32::from_rgb(80, 85, 105)).font(FontId::monospace(10.5)));
+                            }
+                        });
+                        ui.add_space(2.0);
                     }
 
                     if let Some(picked) = pick_project {
